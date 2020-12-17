@@ -132,6 +132,10 @@ int board_detect_gt911(struct display_info_t const *di)
 	int ret;
 	struct udevice *dev, *chip;
 
+#ifdef CONFIG_DM_VIDEO
+	if (di->bus_gp)
+		gpio_request(di->bus_gp, "lkt08_mipi_en");
+#endif
 	if (di->bus_gp)
 		gpio_direction_output(di->bus_gp, 1);
 	gpio_set_value(GP_GT911_RESET, 0);
@@ -144,12 +148,15 @@ int board_detect_gt911(struct display_info_t const *di)
 	mdelay(50);
 	gpio_direction_input(GPIRQ_GT911);
 	ret = uclass_get_device(UCLASS_I2C, di->bus_num, &dev);
-	if (ret)
-		return 0;
-
-	ret = dm_i2c_probe(dev, di->addr_num, 0x0, &chip);
-	if (ret && di->bus_gp)
-		gpio_direction_input(di->bus_gp);
+	if (!ret) {
+		ret = dm_i2c_probe(dev, di->addr_num, 0x0, &chip);
+		if (ret && di->bus_gp)
+			gpio_direction_input(di->bus_gp);
+	}
+#ifdef CONFIG_DM_VIDEO
+	if (di->bus_gp)
+		gpio_free(di->bus_gp);
+#endif
 	return (ret == 0);
 }
 
@@ -169,7 +176,7 @@ static const struct display_info_t displays[] = {
 	VD_MIPI_1024_768M_60(MIPI, NULL, fbp_bus_gp((3 | (3 << 4)), 0, 0, 0), 0x68, FBP_PCA9546),
 	VD_MIPI_800_600MR_60(MIPI, NULL, fbp_bus_gp((3 | (3 << 4)), 0, 0, 0), 0x68, FBP_PCA9546),
 	VD_MIPI_720_480M_60(MIPI, NULL, fbp_bus_gp((3 | (3 << 4)), 0, 0, 0), 0x68, FBP_PCA9546),
-	VD_MIPI_VTFT101RPFT20(MIPI, fbp_detect_i2c, 3, 0x70, FBP_PCA9540),
+	VD_MIPI_VTFT101RPFT20(MIPI, fbp_detect_i2c, 3, 0x70, FBP_LT8912, FBP_PCA9540),
 };
 #define display_cnt	ARRAY_SIZE(displays)
 #else
@@ -183,16 +190,18 @@ int board_init(void)
 	gpio_request(GP_MII_MDC, "mii_mdc");
 	gpio_request(GP_MII_MDIO, "mii_mdio");
 #endif
-	gpio_request(GP_I2C2_SN65DSI83_EN, "sn65dsi83_enable");
 	gpio_request(GP_GT911_RESET, "gt911_reset");
 	gpio_request(GPIRQ_GT911, "gt911_irq");
+#ifndef CONFIG_DM_VIDEO
+	gpio_request(GP_I2C2_SN65DSI83_EN, "sn65dsi83_enable");
 	gpio_request(GP_LTK08_MIPI_EN, "lkt08_mipi_en");
+#endif
 	gpio_request(GP_CSI1_MIPI_PWDN, "csi1_mipi_pwdn");
 	gpio_request(GP_CSI1_MIPI_RESET, "csi1_mipi_reset");
 	gpio_direction_output(GP_GT911_RESET, 0);
 	gpio_direction_output(GP_CSI1_MIPI_PWDN, 1);
 	gpio_direction_output(GP_CSI1_MIPI_RESET, 0);
-#ifdef CONFIG_MXC_SPI
+#if defined(CONFIG_MXC_SPI) && !defined(CONFIG_DM_SPI)
 	setup_spi();
 #endif
 

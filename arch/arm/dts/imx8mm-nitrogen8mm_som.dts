@@ -15,6 +15,7 @@
 
 	pinctrl_sn65dsi83: sn65dsi83grp {
 		fsl,pins = <
+#define GP_SN65DSI83_IRQ <&gpio1 1 GPIO_ACTIVE_HIGH>
 #define GPIRQ_SN65DSI83	<&gpio1 1 IRQ_TYPE_LEVEL_HIGH>
 			MX8MMN(IOMUXC_GPIO1_IO01_GPIO1_IO1, 0x04)
 #undef  GP_SN65DSI83_EN
