@@ -10,6 +10,7 @@
 #include <dm.h>
 #include <dm/uclass-internal.h>
 #include <dm/device-internal.h>
+#include <dm/lists.h>
 #include <dm/ofnode.h>
 #include <dm/read.h>
 #include <command.h>
@@ -231,33 +232,68 @@ ofnode ofnode_graph_get_remote_port_parent(ofnode node)
 
 int find_device_by_ofnode(ofnode node, struct udevice **pdev)
 {
+	struct udevice *dev;
+	struct udevice *new;
+	ofnode np;
 	int ret;
 
-	if (!ofnode_is_available(node))
+	debug("device of %s\n", ofnode_get_name(node));
+	if (!ofnode_is_available(node)) {
+		debug("-2 %s\n", ofnode_get_name(node));
 		return -2;
+	}
 
 	ret = uclass_find_device_by_ofnode(UCLASS_DISPLAY, node, pdev);
-	if (!ret)
+	if (!ret) {
+		debug("display %s\n", ofnode_get_name(node));
 		return 0;
+	}
 
 	ret = uclass_find_device_by_ofnode(UCLASS_DSI_HOST, node, pdev);
-	if (!ret)
+	if (!ret) {
+		debug("host %s\n", ofnode_get_name(node));
 		return 0;
+	}
 
 	ret = uclass_find_device_by_ofnode(UCLASS_VIDEO_BRIDGE, node, pdev);
-	if (!ret)
+	if (!ret) {
+		debug("bridge %s\n", ofnode_get_name(node));
 		return 0;
+	}
+
+	if (!ofnode_is_available(node))
+		return -1;
 
 	ret = uclass_find_device_by_ofnode(UCLASS_PANEL, node, pdev);
-	if (!ret)
+	if (!ret) {
+		debug("panel %s\n", ofnode_get_name(node));
 		return 0;
+	}
+	np = ofnode_get_parent(node);
 
+	if (!ofnode_valid(np))
+		return -1;
+
+	ret = uclass_find_device_by_ofnode(UCLASS_I2C, np, &dev);
+	if (!ret) {
+		ret = lists_bind_fdt(dev, node, &new, false);
+		if (!ret) {
+			if (device_get_uclass_id(new) == UCLASS_PANEL) {
+				*pdev = new;
+				debug("panel %s\n", ofnode_get_name(node));
+				return 0;
+			}
+		}
+	}
+
+	debug("-1 %s\n", ofnode_get_name(node));
 	return -1;
 }
 
 static void video_link_stack_push(struct udevice *dev)
 {
 	if (temp_stack.dev_num < MAX_LINK_DEVICES) {
+		debug("!!!! add [%d] = dev %s\n", temp_stack.dev_num, dev->name);
 		temp_stack.link_devs[temp_stack.dev_num] = dev;
 		temp_stack.dev_num++;
 	}
@@ -292,14 +328,16 @@ static void video_link_add_node(struct udevice *peer_dev, struct udevice *dev, o
 	struct udevice *remote_dev;
 	bool find = false;
 
-	debug("endpoint cnt %d\n", ofnode_graph_get_endpoint_count(dev_node));
+	debug("endpoint cnt %s, %d\n",  ofnode_get_name(dev_node), ofnode_graph_get_endpoint_count(dev_node));
 
 	video_link_stack_push(dev);
 
 	for_each_endpoint_of_node(dev_node, endpoint_node) {
 		remote = ofnode_graph_get_remote_port_parent(endpoint_node);
-		if (!ofnode_valid(remote))
+		if (!ofnode_valid(remote)) {
+			debug("no parent of %s\n", ofnode_get_name(endpoint_node));
 			continue;
+		}
 
 		debug("remote %s\n", ofnode_get_name(remote));
 		ret = find_device_by_ofnode(remote, &remote_dev);
