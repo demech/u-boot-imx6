@@ -553,6 +553,7 @@
 		backlight_mipi = &backlight_mipi;
 		fb_mipi = &fb_mipi;
 		lcdif = &lcdif;
+		lt8912 = &lt8912;
 		mipi = &fb_mipi;
 		mipi_dsi = &mipi_dsi;
 		mipi_to_lvds = &mipi_to_lvds;
@@ -852,8 +853,8 @@
 		status = "disabled";
 
 		port@0 {
-			lvds_from_dsim: endpoint {
-				remote-endpoint = <&dsim_to_lvds>;
+			lvds_from_panel: endpoint {
+				remote-endpoint = <&panel_to_lvds>;
 			};
 		};
 	};
@@ -955,7 +956,6 @@
 	pca9540: i2cmux9540@70 {
 		compatible = "pca9540";
 		reg = <0x70>;
-		status = "disabled";
 		#address-cells = <1>;
 		#size-cells = <0>;
 
@@ -975,6 +975,7 @@
 			#size-cells = <0>;
 
 			lt8912: lt8912@48 {
+				alias = <&lt8912>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_lt8912>;
 				compatible = "lontium,lt8912" ;
@@ -982,6 +983,13 @@
 				reg = <0x48> ;
 				reset-gpios = GP_LT8912_RESET;
 				display-dsi = <&fb_mipi>;
+				status = "disabled";
+
+				port@0 {
+					lt8912_from_panel: endpoint {
+						remote-endpoint = <&panel_to_lt8912>;
+					};
+				};
 			};
 		};
 	};
@@ -1222,8 +1230,14 @@
 		};
 
 		port@2 {
-			dsim_to_lvds: endpoint {
-				remote-endpoint = <&lvds_from_dsim>;
+			panel_to_lvds: endpoint {
+				remote-endpoint = <&lvds_from_panel>;
+			};
+		};
+
+		port@3 {
+			panel_to_lt8912: endpoint {
+				remote-endpoint = <&lt8912_from_panel>;
 			};
 		};
 	};
